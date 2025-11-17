@@ -1,6 +1,3 @@
-// README.md
-// Crystal Heart Love Letter Experience - Interactive 3D romantic web application
-
 # Crystal Heart Love Letter Experience
 
 An interactive 3D romantic web experience featuring a diamond-to-heart transformation with crack progression mechanics and immersive visual effects. Built with production-grade standards targeting 50-60 FPS performance on mobile devices.
