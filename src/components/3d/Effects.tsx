@@ -1,5 +1,5 @@
 // src/components/3d/Effects.tsx
-// Post-processing effects with mobile-optimized bloom and optional vignette
+// Post-processing effects with cinematic bloom and vignette for professional framing
 
 import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
@@ -10,14 +10,16 @@ interface EffectsProps {
   bloomThreshold?: number;
   enableVignette?: boolean;
   vignetteIntensity?: number;
+  vignetteOffset?: number;
 }
 
 export function Effects({
   enableBloom = true,
-  bloomIntensity = 0.5,
+  bloomIntensity = 0.3,
   bloomThreshold = 0.9,
-  enableVignette = false,
+  enableVignette = true,
   vignetteIntensity = 0.5,
+  vignetteOffset = 0.5,
 }: EffectsProps) {
   if (!enableBloom && !enableVignette) {
     return null;
@@ -33,7 +35,7 @@ export function Effects({
         blendFunction={BlendFunction.ADD}
       />
       <Vignette
-        offset={0.3}
+        offset={vignetteOffset}
         darkness={enableVignette ? vignetteIntensity : 0}
         blendFunction={BlendFunction.NORMAL}
       />

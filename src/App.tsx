@@ -1,11 +1,12 @@
 // src/App.tsx
-// Main application component with Canvas setup and Phase 1 scene integration
+// Main application with Canvas, enhanced effects, and premium fade-in experience
 
 import { Canvas } from '@react-three/fiber';
 import { Suspense } from 'react';
 import { Scene } from './components/3d/Scene';
 import { Effects } from './components/3d/Effects';
 import { PerformanceMonitor } from './components/3d/PerformanceMonitor';
+import { SceneFadeIn } from './components/ui/SceneFadeIn';
 
 function App() {
   return (
@@ -22,10 +23,17 @@ function App() {
       >
         <Suspense fallback={null}>
           <Scene />
-          <Effects enableBloom={true} bloomIntensity={0.5} enableVignette={false} />
+          <Effects
+            enableBloom={true}
+            bloomIntensity={0.3}
+            enableVignette={true}
+            vignetteOffset={0.5}
+            vignetteIntensity={0.5}
+          />
         </Suspense>
       </Canvas>
       <PerformanceMonitor />
+      <SceneFadeIn duration={1000} delay={300} />
     </div>
   );
 }

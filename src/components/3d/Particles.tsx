@@ -1,18 +1,28 @@
 // src/components/3d/Particles.tsx
-// Floating particle system with star-like appearance using radial gradient texture
+// Enhanced star particle system with twinkling animation and color variation for natural appearance
 
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
+import { COLORS } from '@/constants/colors';
 
 interface ParticlesProps {
   count?: number;
   size?: number;
   opacity?: number;
   spread?: number;
+  twinkleSpeed?: number;
+  twinkleIntensity?: number;
 }
 
-export function Particles({ count = 75, size = 0.05, opacity = 0.6, spread = 8 }: ParticlesProps) {
+export function Particles({
+  count = 120,
+  size = 0.05,
+  opacity = 0.6,
+  spread = 10,
+  twinkleSpeed = 0.5,
+  twinkleIntensity = 0.3,
+}: ParticlesProps) {
   const pointsRef = useRef<THREE.Points>(null);
 
   const particleTexture = useMemo(() => {
@@ -46,10 +56,18 @@ export function Particles({ count = 75, size = 0.05, opacity = 0.6, spread = 8 }
     return texture;
   }, []);
 
-  const [positions, velocities, sizes] = useMemo(() => {
+  const [positions, velocities, sizes, colors, twinklePhases] = useMemo(() => {
     const positions = new Float32Array(count * 3);
     const velocities = new Float32Array(count * 3);
     const sizes = new Float32Array(count);
+    const colors = new Float32Array(count * 3);
+    const twinklePhases = new Float32Array(count);
+
+    const colorPalette = [
+      new THREE.Color(COLORS.particle.white),
+      new THREE.Color(COLORS.particle.tintPink),
+      new THREE.Color(COLORS.particle.tintPurple),
+    ];
 
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
@@ -63,18 +81,30 @@ export function Particles({ count = 75, size = 0.05, opacity = 0.6, spread = 8 }
       velocities[i3 + 2] = (Math.random() - 0.5) * 0.0002;
 
       sizes[i] = Math.random() * 0.5 + 0.5;
+
+      const colorChoice = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+      if (colorChoice) {
+        colors[i3] = colorChoice.r;
+        colors[i3 + 1] = colorChoice.g;
+        colors[i3 + 2] = colorChoice.b;
+      }
+
+      twinklePhases[i] = Math.random() * Math.PI * 2;
     }
 
-    return [positions, velocities, sizes];
+    return [positions, velocities, sizes, colors, twinklePhases];
   }, [count, spread]);
 
   useFrame((state) => {
     if (!pointsRef.current) return;
 
     const positionAttribute = pointsRef.current.geometry.attributes.position;
-    if (!positionAttribute) return;
+    const sizeAttribute = pointsRef.current.geometry.attributes.size;
+
+    if (!positionAttribute || !sizeAttribute) return;
 
     const positions = positionAttribute.array as Float32Array;
+    const sizes = sizeAttribute.array as Float32Array;
     const time = state.clock.elapsedTime;
 
     for (let i = 0; i < count; i++) {
@@ -105,9 +135,15 @@ export function Particles({ count = 75, size = 0.05, opacity = 0.6, spread = 8 }
       if (Math.abs(positions[i3 + 2] ?? 0) > spread / 2) {
         positions[i3 + 2] = -(positions[i3 + 2] ?? 0);
       }
+
+      const baseSize = sizes[i] ?? 1;
+      const twinklePhase = twinklePhases[i] ?? 0;
+      const twinkle = Math.sin(time * twinkleSpeed + twinklePhase) * twinkleIntensity;
+      sizes[i] = baseSize * (1 + twinkle);
     }
 
     positionAttribute.needsUpdate = true;
+    sizeAttribute.needsUpdate = true;
   });
 
   if (!particleTexture) {
@@ -124,6 +160,7 @@ export function Particles({ count = 75, size = 0.05, opacity = 0.6, spread = 8 }
           itemSize={3}
         />
         <bufferAttribute attach="attributes-size" count={count} array={sizes} itemSize={1} />
+        <bufferAttribute attach="attributes-color" count={count} array={colors} itemSize={3} />
       </bufferGeometry>
       <pointsMaterial
         size={size}
@@ -133,7 +170,7 @@ export function Particles({ count = 75, size = 0.05, opacity = 0.6, spread = 8 }
         sizeAttenuation
         depthWrite={false}
         blending={THREE.AdditiveBlending}
-        vertexColors={false}
+        vertexColors
       />
     </points>
   );
