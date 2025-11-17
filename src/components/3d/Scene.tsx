@@ -1,8 +1,8 @@
 // src/components/3d/Scene.tsx
-// Main scene orchestrator with Phase 1 environment, Phase 2 diamond interaction, and Phase 3 transition system
+// Main scene orchestrator with coordinated camera control for smooth transitions
 
-import { useState, useCallback } from 'react';
-import { Camera } from './Camera';
+import { useState, useCallback, useRef } from 'react';
+import { Camera, CameraMode, type CameraHandle } from './Camera';
 import { LightingRig } from './LightingRig';
 import { Background } from './Background';
 import { Particles } from './Particles';
@@ -14,12 +14,37 @@ import { useDiamondInteraction } from '@/hooks/useDiamondInteraction';
 export function Scene() {
   const { handleTap, currentTapEvent } = useDiamondInteraction();
   const [diamondVisible, setDiamondVisible] = useState(true);
+  const cameraRef = useRef<CameraHandle>(null);
 
   const handleShatterStart = useCallback(() => {
     setDiamondVisible(false);
 
     if (import.meta.env.DEV) {
       console.log('Diamond hidden, shatter animation starting');
+    }
+  }, []);
+
+  const handleCinematicStart = useCallback(() => {
+    if (cameraRef.current) {
+      cameraRef.current.setMode(CameraMode.LOCKED);
+
+      if (import.meta.env.DEV) {
+        console.log('Camera locked for cinematic sequence');
+      }
+    }
+  }, []);
+
+  const handleCinematicComplete = useCallback(() => {
+    if (cameraRef.current) {
+      setTimeout(() => {
+        if (cameraRef.current) {
+          cameraRef.current.setMode(CameraMode.DRIFT);
+
+          if (import.meta.env.DEV) {
+            console.log('Camera returned to drift mode after cinematic');
+          }
+        }
+      }, 100);
     }
   }, []);
 
@@ -31,7 +56,13 @@ export function Scene() {
 
   return (
     <>
-      <Camera position={[0, 0, 5]} fov={55} introAnimation={true} enableDrift={true} />
+      <Camera
+        ref={cameraRef}
+        position={[0, 0, 5]}
+        fov={55}
+        introAnimation={true}
+        enableDrift={true}
+      />
 
       <LightingRig enableShadows={true} />
 
@@ -54,7 +85,10 @@ export function Scene() {
         <TransitionOrchestrator
           diamondPosition={[0, 0, 0]}
           onShatterStart={handleShatterStart}
+          onCinematicStart={handleCinematicStart}
+          onCinematicComplete={handleCinematicComplete}
           onTransitionComplete={handleTransitionComplete}
+          cameraRef={cameraRef}
         />
       </group>
     </>

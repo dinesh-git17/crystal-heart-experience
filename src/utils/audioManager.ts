@@ -1,8 +1,22 @@
 // src/utils/audioManager.ts
-// Audio manager with crack sounds, shatter effect, and background music support using Web Audio API
+// Audio manager with custom crack, shatter, and looping background music using Web Audio API
 
 import { CRACK_SOUND_VOLUME } from '@/constants/crackLevels';
 import type { CrackLevel } from '@/types/diamond';
+
+interface MusicLoopConfig {
+  loopStart: number;
+  loopEnd: number;
+  fadeInDuration: number;
+  fadeOutDuration: number;
+}
+
+const DEFAULT_MUSIC_CONFIG: MusicLoopConfig = {
+  loopStart: 0,
+  loopEnd: 0,
+  fadeInDuration: 2.0,
+  fadeOutDuration: 2.0,
+};
 
 class AudioManager {
   private context: AudioContext | null = null;
@@ -11,9 +25,16 @@ class AudioManager {
   private volume = CRACK_SOUND_VOLUME;
   private gainNode: GainNode | null = null;
   private musicGainNode: GainNode | null = null;
-  private currentMusicSource: OscillatorNode | null = null;
+  private currentMusicSource: AudioBufferSourceNode | null = null;
   private musicPlaying = false;
   private musicFadeInterval: number | null = null;
+  private crackSoundBuffer: AudioBuffer | null = null;
+  private crackSoundLoaded = false;
+  private shatterSoundBuffer: AudioBuffer | null = null;
+  private shatterSoundLoaded = false;
+  private backgroundMusicBuffer: AudioBuffer | null = null;
+  private backgroundMusicLoaded = false;
+  private musicConfig: MusicLoopConfig = DEFAULT_MUSIC_CONFIG;
 
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -37,8 +58,88 @@ class AudioManager {
       if (this.context.state === 'suspended') {
         await this.context.resume();
       }
+
+      await Promise.all([
+        this.loadCrackSound(),
+        this.loadShatterSound(),
+        this.loadBackgroundMusic(),
+      ]);
     } catch (error) {
       console.error('Failed to initialize AudioContext:', error);
+    }
+  }
+
+  private async loadCrackSound(): Promise<void> {
+    if (!this.context || this.crackSoundLoaded) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/audio/crack.wav');
+      const arrayBuffer = await response.arrayBuffer();
+      this.crackSoundBuffer = await this.context.decodeAudioData(arrayBuffer);
+      this.crackSoundLoaded = true;
+
+      if (import.meta.env.DEV) {
+        console.log('Crack sound loaded successfully');
+      }
+    } catch (error) {
+      console.error('Failed to load crack sound, falling back to synthesized:', error);
+      this.crackSoundLoaded = false;
+    }
+  }
+
+  private async loadShatterSound(): Promise<void> {
+    if (!this.context || this.shatterSoundLoaded) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/audio/shatter.wav');
+      const arrayBuffer = await response.arrayBuffer();
+      this.shatterSoundBuffer = await this.context.decodeAudioData(arrayBuffer);
+      this.shatterSoundLoaded = true;
+
+      if (import.meta.env.DEV) {
+        console.log('Shatter sound loaded successfully');
+      }
+    } catch (error) {
+      console.error('Failed to load shatter sound, falling back to synthesized:', error);
+      this.shatterSoundLoaded = false;
+    }
+  }
+
+  private async loadBackgroundMusic(): Promise<void> {
+    if (!this.context || this.backgroundMusicLoaded) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/audio/background-music.mp3');
+      const arrayBuffer = await response.arrayBuffer();
+      this.backgroundMusicBuffer = await this.context.decodeAudioData(arrayBuffer);
+      this.backgroundMusicLoaded = true;
+
+      const duration = this.backgroundMusicBuffer.duration;
+      this.musicConfig.loopEnd = duration;
+
+      if (import.meta.env.DEV) {
+        console.log('Background music loaded successfully');
+        console.log('Duration:', duration.toFixed(2), 'seconds');
+        console.log('Loop: start =', this.musicConfig.loopStart, 'end =', this.musicConfig.loopEnd);
+      }
+    } catch (error) {
+      console.error('Failed to load background music, falling back to synthesized:', error);
+      this.backgroundMusicLoaded = false;
+    }
+  }
+
+  setMusicLoopPoints(loopStart: number, loopEnd: number): void {
+    this.musicConfig.loopStart = loopStart;
+    this.musicConfig.loopEnd = loopEnd;
+
+    if (import.meta.env.DEV) {
+      console.log('Music loop points updated:', { loopStart, loopEnd });
     }
   }
 
@@ -62,6 +163,44 @@ class AudioManager {
   async playCrackSound(level: CrackLevel): Promise<void> {
     const ready = await this.ensureContext();
     if (!ready || !this.context || !this.gainNode) {
+      return;
+    }
+
+    if (this.crackSoundBuffer && this.crackSoundLoaded) {
+      this.playCustomCrackSound(level);
+    } else {
+      this.playSynthesizedCrackSound(level);
+    }
+  }
+
+  private playCustomCrackSound(level: CrackLevel): void {
+    if (!this.context || !this.gainNode || !this.crackSoundBuffer) {
+      return;
+    }
+
+    const source = this.context.createBufferSource();
+    source.buffer = this.crackSoundBuffer;
+
+    const playbackRate = 0.9 + level * 0.08;
+    source.playbackRate.value = playbackRate;
+
+    const levelGain = this.context.createGain();
+    const volumeMultiplier = 0.8 + level * 0.04;
+    levelGain.gain.value = volumeMultiplier;
+
+    source.connect(levelGain);
+    levelGain.connect(this.gainNode);
+
+    source.start(0);
+
+    source.onended = () => {
+      source.disconnect();
+      levelGain.disconnect();
+    };
+  }
+
+  private playSynthesizedCrackSound(level: CrackLevel): void {
+    if (!this.context || !this.gainNode) {
       return;
     }
 
@@ -95,6 +234,40 @@ class AudioManager {
   async playShatterSound(): Promise<void> {
     const ready = await this.ensureContext();
     if (!ready || !this.context || !this.gainNode) {
+      return;
+    }
+
+    if (this.shatterSoundBuffer && this.shatterSoundLoaded) {
+      this.playCustomShatterSound();
+    } else {
+      this.playSynthesizedShatterSound();
+    }
+  }
+
+  private playCustomShatterSound(): void {
+    if (!this.context || !this.gainNode || !this.shatterSoundBuffer) {
+      return;
+    }
+
+    const source = this.context.createBufferSource();
+    source.buffer = this.shatterSoundBuffer;
+
+    const shatterGain = this.context.createGain();
+    shatterGain.gain.value = 1.0;
+
+    source.connect(shatterGain);
+    shatterGain.connect(this.gainNode);
+
+    source.start(0);
+
+    source.onended = () => {
+      source.disconnect();
+      shatterGain.disconnect();
+    };
+  }
+
+  private playSynthesizedShatterSound(): void {
+    if (!this.context || !this.gainNode) {
       return;
     }
 
@@ -139,6 +312,47 @@ class AudioManager {
       return;
     }
 
+    if (this.backgroundMusicBuffer && this.backgroundMusicLoaded) {
+      this.playCustomBackgroundMusic();
+    } else {
+      this.playSynthesizedBackgroundMusic();
+    }
+  }
+
+  private playCustomBackgroundMusic(): void {
+    if (!this.context || !this.musicGainNode || !this.backgroundMusicBuffer) {
+      return;
+    }
+
+    const source = this.context.createBufferSource();
+    source.buffer = this.backgroundMusicBuffer;
+
+    source.loop = true;
+    source.loopStart = this.musicConfig.loopStart;
+    source.loopEnd = this.musicConfig.loopEnd;
+
+    source.connect(this.musicGainNode);
+
+    source.start(0);
+
+    this.currentMusicSource = source;
+    this.musicPlaying = true;
+
+    this.fadeInMusic(this.musicConfig.fadeInDuration);
+
+    if (import.meta.env.DEV) {
+      console.log('Custom background music started with loop:', {
+        loopStart: this.musicConfig.loopStart,
+        loopEnd: this.musicConfig.loopEnd,
+      });
+    }
+  }
+
+  private playSynthesizedBackgroundMusic(): void {
+    if (!this.context || !this.musicGainNode) {
+      return;
+    }
+
     const oscillator = this.context.createOscillator();
     const lfoGain = this.context.createGain();
     const lfo = this.context.createOscillator();
@@ -158,10 +372,10 @@ class AudioManager {
     oscillator.start();
     lfo.start();
 
-    this.currentMusicSource = oscillator;
+    this.currentMusicSource = oscillator as unknown as AudioBufferSourceNode;
     this.musicPlaying = true;
 
-    this.fadeInMusic(2.0);
+    this.fadeInMusic(this.musicConfig.fadeInDuration);
   }
 
   fadeInMusic(duration: number): void {
@@ -175,30 +389,28 @@ class AudioManager {
 
     const startVolume = this.musicGainNode.gain.value;
     const targetVolume = this.muted ? 0 : 0.15;
-    const steps = 60;
+    const steps = 20;
     const stepDuration = (duration * 1000) / steps;
     const volumeStep = (targetVolume - startVolume) / steps;
 
     let currentStep = 0;
 
     this.musicFadeInterval = window.setInterval(() => {
-      if (!this.musicGainNode) {
+      currentStep++;
+
+      if (currentStep >= steps || !this.musicGainNode) {
         if (this.musicFadeInterval !== null) {
           window.clearInterval(this.musicFadeInterval);
           this.musicFadeInterval = null;
+        }
+        if (this.musicGainNode) {
+          this.musicGainNode.gain.value = targetVolume;
         }
         return;
       }
 
-      currentStep++;
-      const newVolume = startVolume + volumeStep * currentStep;
-      this.musicGainNode.gain.value = Math.max(0, Math.min(targetVolume, newVolume));
-
-      if (currentStep >= steps) {
-        if (this.musicFadeInterval !== null) {
-          window.clearInterval(this.musicFadeInterval);
-          this.musicFadeInterval = null;
-        }
+      if (this.musicGainNode) {
+        this.musicGainNode.gain.value = startVolume + volumeStep * currentStep;
       }
     }, stepDuration);
   }
@@ -214,49 +426,31 @@ class AudioManager {
 
     const startVolume = this.musicGainNode.gain.value;
     const targetVolume = 0;
-    const steps = 60;
+    const steps = 20;
     const stepDuration = (duration * 1000) / steps;
     const volumeStep = (targetVolume - startVolume) / steps;
 
     let currentStep = 0;
 
     this.musicFadeInterval = window.setInterval(() => {
-      if (!this.musicGainNode) {
+      currentStep++;
+
+      if (currentStep >= steps || !this.musicGainNode) {
         if (this.musicFadeInterval !== null) {
           window.clearInterval(this.musicFadeInterval);
           this.musicFadeInterval = null;
         }
+        if (this.musicGainNode) {
+          this.musicGainNode.gain.value = 0;
+        }
+        this.stopMusic();
         return;
       }
 
-      currentStep++;
-      const newVolume = startVolume + volumeStep * currentStep;
-      this.musicGainNode.gain.value = Math.max(0, newVolume);
-
-      if (currentStep >= steps) {
-        if (this.musicFadeInterval !== null) {
-          window.clearInterval(this.musicFadeInterval);
-          this.musicFadeInterval = null;
-        }
-        this.stopMusic();
+      if (this.musicGainNode) {
+        this.musicGainNode.gain.value = startVolume + volumeStep * currentStep;
       }
     }, stepDuration);
-  }
-
-  pauseMusic(): void {
-    if (!this.musicGainNode || !this.musicPlaying) {
-      return;
-    }
-
-    this.musicGainNode.gain.value = 0;
-  }
-
-  resumeMusic(): void {
-    if (!this.musicGainNode || !this.musicPlaying) {
-      return;
-    }
-
-    this.musicGainNode.gain.value = this.muted ? 0 : 0.15;
   }
 
   private stopMusic(): void {

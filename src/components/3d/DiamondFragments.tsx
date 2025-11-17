@@ -1,12 +1,13 @@
 // src/components/3d/DiamondFragments.tsx
-// Large diamond fragment system for shatter animation with radial burst physics and cleanup
+// Enhanced diamond fragments with staggered timing, motion trails, and coordinated glow burst
 
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { COLORS } from '@/constants/colors';
 import { DEFAULT_SHATTER_CONFIG } from '@/types/heart';
 import type { FragmentData } from '@/types/heart';
+import { easeOutExpo, easeInQuad } from '@/utils/easingFunctions';
+import { COLORS } from '@/constants/colors';
 
 interface DiamondFragmentsProps {
   triggerShatter: boolean;
@@ -14,110 +15,110 @@ interface DiamondFragmentsProps {
   onComplete?: () => void;
 }
 
-const FRAGMENT_GEOMETRY_DETAIL = 0;
-
 export function DiamondFragments({
   triggerShatter,
   diamondPosition = [0, 0, 0],
   onComplete,
 }: DiamondFragmentsProps) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const fragmentsRef = useRef<FragmentData[]>([]);
-  const matrixRef = useRef(new THREE.Matrix4());
-  const colorRef = useRef(new THREE.Color(COLORS.primary.main));
-  const hasShatteredRef = useRef(false);
+  const fragmentsRef = useRef<THREE.Group>(null);
+  const [fragments, setFragments] = useState<FragmentData[]>([]);
   const startTimeRef = useRef<number | null>(null);
+  const hasTriggeredRef = useRef(false);
+  const glowBurstRef = useRef<THREE.PointLight | null>(null);
 
-  const geometry = useMemo(() => {
-    return new THREE.OctahedronGeometry(0.15, FRAGMENT_GEOMETRY_DETAIL);
+  const fragmentGeometries = useMemo(() => {
+    return Array.from({ length: DEFAULT_SHATTER_CONFIG.fragmentCount }, () => {
+      const size =
+        DEFAULT_SHATTER_CONFIG.minFragmentSize +
+        Math.random() *
+          (DEFAULT_SHATTER_CONFIG.maxFragmentSize - DEFAULT_SHATTER_CONFIG.minFragmentSize);
+
+      const geometry = new THREE.OctahedronGeometry(size, 0);
+
+      const scaleVariation = 0.5 + Math.random() * 0.5;
+      geometry.scale(scaleVariation, 1 + Math.random() * 0.3, scaleVariation);
+
+      return geometry;
+    });
   }, []);
 
-  const material = useMemo(() => {
+  const fragmentMaterial = useMemo(() => {
     return new THREE.MeshPhysicalMaterial({
       color: new THREE.Color(COLORS.primary.main),
       transmission: 0.8,
       roughness: 0.15,
       metalness: 0.2,
-      ior: 2.417,
-      thickness: 0.3,
-      emissive: new THREE.Color(COLORS.primary.dark),
-      emissiveIntensity: 0.2,
+      ior: 2.4,
+      thickness: 0.4,
+      envMapIntensity: 1.2,
+      emissive: new THREE.Color(COLORS.primary.light),
+      emissiveIntensity: 0.3,
       transparent: true,
-      opacity: 1.0,
+      opacity: 0.8,
       side: THREE.DoubleSide,
     });
   }, []);
 
   useEffect(() => {
-    if (!triggerShatter || hasShatteredRef.current || !meshRef.current) {
-      return;
-    }
+    if (triggerShatter && !hasTriggeredRef.current) {
+      hasTriggeredRef.current = true;
 
-    hasShatteredRef.current = true;
-    startTimeRef.current = null;
-    fragmentsRef.current = [];
+      const newFragments: FragmentData[] = Array.from(
+        { length: DEFAULT_SHATTER_CONFIG.fragmentCount },
+        (_, i) => {
+          const theta = (i / DEFAULT_SHATTER_CONFIG.fragmentCount) * Math.PI * 2;
+          const phi = Math.acos(2 * Math.random() - 1);
+          const randomRadius = 0.3 + Math.random() * 0.4;
 
-    const centerPos = new THREE.Vector3(...diamondPosition);
-    const fragmentCount = DEFAULT_SHATTER_CONFIG.fragmentCount;
+          const x = randomRadius * Math.sin(phi) * Math.cos(theta);
+          const y = randomRadius * Math.sin(phi) * Math.sin(theta);
+          const z = randomRadius * Math.cos(phi);
 
-    for (let i = 0; i < fragmentCount; i++) {
-      const phi = Math.acos(2 * (i / fragmentCount) - 1);
-      const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+          const velocityMagnitude =
+            DEFAULT_SHATTER_CONFIG.initialVelocity *
+            (1 + (Math.random() - 0.5) * DEFAULT_SHATTER_CONFIG.velocityVariation);
 
-      const baseDirection = new THREE.Vector3(
-        Math.sin(phi) * Math.cos(theta),
-        Math.cos(phi),
-        Math.sin(phi) * Math.sin(theta)
-      ).normalize();
+          const staggerDelay = i * DEFAULT_SHATTER_CONFIG.staggerDelay;
+          const maxLife = DEFAULT_SHATTER_CONFIG.duration + staggerDelay;
 
-      const spreadAngle = (Math.random() - 0.5) * 0.4;
-      const spreadAxis = new THREE.Vector3(
-        Math.random() - 0.5,
-        Math.random() - 0.5,
-        Math.random() - 0.5
-      ).normalize();
+          return {
+            id: `fragment-${i}`,
+            position: new THREE.Vector3(
+              diamondPosition[0] + x * 0.2,
+              diamondPosition[1] + y * 0.2,
+              diamondPosition[2] + z * 0.2
+            ),
+            velocity: new THREE.Vector3(x, y, z).normalize().multiplyScalar(velocityMagnitude),
+            rotation: new THREE.Euler(
+              Math.random() * Math.PI * 2,
+              Math.random() * Math.PI * 2,
+              Math.random() * Math.PI * 2
+            ),
+            rotationVelocity: new THREE.Vector3(
+              (Math.random() - 0.5) * DEFAULT_SHATTER_CONFIG.rotationSpeed,
+              (Math.random() - 0.5) * DEFAULT_SHATTER_CONFIG.rotationSpeed,
+              (Math.random() - 0.5) * DEFAULT_SHATTER_CONFIG.rotationSpeed
+            ),
+            scale: 1.0,
+            opacity: 0.8,
+            lifeProgress: -staggerDelay / maxLife,
+            maxLife: maxLife,
+            active: true,
+          };
+        }
+      );
 
-      const spreadQuaternion = new THREE.Quaternion().setFromAxisAngle(spreadAxis, spreadAngle);
-      const finalDirection = baseDirection.clone().applyQuaternion(spreadQuaternion);
+      setFragments(newFragments);
+      startTimeRef.current = null;
 
-      const speed =
-        DEFAULT_SHATTER_CONFIG.initialVelocity *
-        (1 + (Math.random() - 0.5) * DEFAULT_SHATTER_CONFIG.velocityVariation);
-
-      const velocity = finalDirection.multiplyScalar(speed);
-
-      const sizeVariation =
-        DEFAULT_SHATTER_CONFIG.minFragmentSize +
-        Math.random() *
-          (DEFAULT_SHATTER_CONFIG.maxFragmentSize - DEFAULT_SHATTER_CONFIG.minFragmentSize);
-
-      const fragment: FragmentData = {
-        id: `fragment-${i}`,
-        position: centerPos.clone(),
-        velocity: velocity,
-        rotation: new THREE.Euler(
-          Math.random() * Math.PI * 2,
-          Math.random() * Math.PI * 2,
-          Math.random() * Math.PI * 2
-        ),
-        rotationVelocity: new THREE.Vector3(
-          (Math.random() - 0.5) * DEFAULT_SHATTER_CONFIG.rotationSpeed,
-          (Math.random() - 0.5) * DEFAULT_SHATTER_CONFIG.rotationSpeed,
-          (Math.random() - 0.5) * DEFAULT_SHATTER_CONFIG.rotationSpeed
-        ),
-        scale: sizeVariation,
-        opacity: 1.0,
-        lifeProgress: 0,
-        maxLife: DEFAULT_SHATTER_CONFIG.duration,
-        active: true,
-      };
-
-      fragmentsRef.current.push(fragment);
+      if (import.meta.env.DEV) {
+        console.log('Diamond fragments created with stagger delays');
+      }
     }
   }, [triggerShatter, diamondPosition]);
 
   useFrame((state, delta) => {
-    if (!meshRef.current || fragmentsRef.current.length === 0 || !hasShatteredRef.current) {
+    if (!hasTriggeredRef.current || fragments.length === 0) {
       return;
     }
 
@@ -126,88 +127,159 @@ export function DiamondFragments({
     }
 
     const elapsed = state.clock.elapsedTime - startTimeRef.current;
-    let activeCount = 0;
 
-    fragmentsRef.current.forEach((fragment, index) => {
+    let allComplete = true;
+
+    const updatedFragments = fragments.map((fragment) => {
       if (!fragment.active) {
-        meshRef.current!.setMatrixAt(index, new THREE.Matrix4().makeScale(0, 0, 0));
-        return;
+        return fragment;
       }
 
-      fragment.lifeProgress = Math.min(elapsed / fragment.maxLife, 1);
+      const newLifeProgress = elapsed / fragment.maxLife;
 
-      if (fragment.lifeProgress >= 1) {
-        fragment.active = false;
-        meshRef.current!.setMatrixAt(index, new THREE.Matrix4().makeScale(0, 0, 0));
-        return;
+      if (newLifeProgress < 0) {
+        allComplete = false;
+        return { ...fragment, lifeProgress: newLifeProgress };
       }
 
-      activeCount++;
+      if (newLifeProgress >= 1) {
+        return { ...fragment, active: false, opacity: 0 };
+      }
 
-      fragment.velocity.y -= DEFAULT_SHATTER_CONFIG.gravity * delta;
-      fragment.position.add(fragment.velocity.clone().multiplyScalar(delta));
+      allComplete = false;
 
-      fragment.rotation.x += fragment.rotationVelocity.x * delta;
-      fragment.rotation.y += fragment.rotationVelocity.y * delta;
-      fragment.rotation.z += fragment.rotationVelocity.z * delta;
+      const adjustedProgress = newLifeProgress;
+      const fadeProgress = Math.max(0, (adjustedProgress - 0.6) / 0.4);
 
-      const opacityProgress = fragment.lifeProgress;
-      const opacity = 1 - Math.pow(opacityProgress, 2);
-      fragment.opacity = opacity;
+      const newPosition = fragment.position.clone();
+      newPosition.add(fragment.velocity.clone().multiplyScalar(delta));
+      newPosition.y -= DEFAULT_SHATTER_CONFIG.gravity * delta;
 
-      const scale = fragment.scale * (1 - opacityProgress * 0.2);
-
-      matrixRef.current.compose(
-        fragment.position,
-        new THREE.Quaternion().setFromEuler(fragment.rotation),
-        new THREE.Vector3(scale, scale, scale)
+      const newRotation = new THREE.Euler(
+        fragment.rotation.x + fragment.rotationVelocity.x * delta,
+        fragment.rotation.y + fragment.rotationVelocity.y * delta,
+        fragment.rotation.z + fragment.rotationVelocity.z * delta
       );
 
-      meshRef.current!.setMatrixAt(index, matrixRef.current);
+      const newOpacity = (1 - easeOutExpo(fadeProgress)) * 0.8;
 
-      colorRef.current.setStyle(COLORS.primary.main);
-      colorRef.current.multiplyScalar(opacity);
-      meshRef.current!.setColorAt(index, colorRef.current);
+      const scaleProgress = Math.min(adjustedProgress / 0.3, 1);
+      const newScale = 1.0 - easeInQuad(scaleProgress) * 0.2;
+
+      return {
+        ...fragment,
+        position: newPosition,
+        rotation: newRotation,
+        opacity: newOpacity,
+        scale: newScale,
+        lifeProgress: newLifeProgress,
+      };
     });
 
-    if (meshRef.current.instanceMatrix) {
-      meshRef.current.instanceMatrix.needsUpdate = true;
-    }
-    if (meshRef.current.instanceColor) {
-      meshRef.current.instanceColor.needsUpdate = true;
+    setFragments(updatedFragments);
+
+    if (DEFAULT_SHATTER_CONFIG.glowBurstEnabled && glowBurstRef.current) {
+      const burstProgress = Math.min(elapsed / 0.4, 1);
+      const burstIntensity = (1 - easeOutExpo(burstProgress)) * 3.0;
+      glowBurstRef.current.intensity = burstIntensity;
     }
 
-    if (activeCount === 0 && fragmentsRef.current.length > 0) {
-      if (onComplete) {
-        onComplete();
+    if (allComplete && onComplete) {
+      onComplete();
+      hasTriggeredRef.current = false;
+
+      if (import.meta.env.DEV) {
+        console.log('All fragments complete');
       }
-      fragmentsRef.current = [];
-      hasShatteredRef.current = false;
-      startTimeRef.current = null;
     }
   });
 
   useEffect(() => {
     return () => {
-      geometry.dispose();
-      material.dispose();
+      fragmentGeometries.forEach((geo) => geo.dispose());
+      fragmentMaterial.dispose();
     };
-  }, [geometry, material]);
+  }, [fragmentGeometries, fragmentMaterial]);
 
-  if (!triggerShatter) {
+  if (!triggerShatter || fragments.length === 0) {
     return null;
   }
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, DEFAULT_SHATTER_CONFIG.fragmentCount]}
-      frustumCulled={false}
-    >
-      <instancedBufferAttribute
-        attach="instanceColor"
-        args={[new Float32Array(DEFAULT_SHATTER_CONFIG.fragmentCount * 3), 3]}
+    <group ref={fragmentsRef}>
+      {DEFAULT_SHATTER_CONFIG.glowBurstEnabled && (
+        <pointLight
+          ref={glowBurstRef}
+          position={diamondPosition}
+          color={new THREE.Color('#ff69b4')}
+          intensity={0}
+          distance={8}
+          decay={2}
+        />
+      )}
+
+      {fragments.map((fragment, index) => {
+        if (!fragment.active || fragment.lifeProgress < 0) {
+          return null;
+        }
+
+        return (
+          <group
+            key={fragment.id}
+            position={fragment.position.toArray()}
+            rotation={fragment.rotation}
+            scale={fragment.scale}
+          >
+            <mesh
+              geometry={fragmentGeometries[index]}
+              material={fragmentMaterial}
+              material-opacity={fragment.opacity}
+            />
+
+            {DEFAULT_SHATTER_CONFIG.trailIntensity > 0 && fragment.lifeProgress < 0.5 && (
+              <FragmentTrail
+                velocity={fragment.velocity}
+                opacity={fragment.opacity * DEFAULT_SHATTER_CONFIG.trailIntensity}
+              />
+            )}
+          </group>
+        );
+      })}
+    </group>
+  );
+}
+
+interface FragmentTrailProps {
+  velocity: THREE.Vector3;
+  opacity: number;
+}
+
+function FragmentTrail({ velocity, opacity }: FragmentTrailProps) {
+  const trailRef = useRef<THREE.Mesh>(null);
+
+  useFrame(() => {
+    if (trailRef.current) {
+      const direction = velocity.clone().normalize();
+      const length = velocity.length() * 0.3;
+
+      trailRef.current.scale.set(0.02, length, 0.02);
+
+      const angle = Math.atan2(direction.x, direction.z);
+      const elevation = Math.asin(direction.y);
+
+      trailRef.current.rotation.set(elevation, angle, 0);
+    }
+  });
+
+  return (
+    <mesh ref={trailRef} position={[0, 0, 0]}>
+      <cylinderGeometry args={[0.01, 0.03, 1, 8]} />
+      <meshBasicMaterial
+        color={new THREE.Color(COLORS.primary.light)}
+        transparent
+        opacity={opacity * 0.5}
+        depthWrite={false}
       />
-    </instancedMesh>
+    </mesh>
   );
 }
