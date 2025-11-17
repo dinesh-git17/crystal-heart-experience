@@ -1,19 +1,24 @@
 // src/components/3d/Diamond.tsx
-// Interactive rose-diamond crystal with fallback geometry
+// Enhanced diamond with heartbeat pulse, organic floating, and polished material properties
 
+import { useRef, useMemo, useCallback, useState } from 'react';
 import { useFrame, ThreeEvent } from '@react-three/fiber';
-import { useRef, useMemo, useCallback } from 'react';
 import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { DiamondCracks } from './DiamondCracks';
 import {
-  useDiamondStore,
   useDiamondCrackLevel,
+  useDiamondStore,
   useCurrentCrackConfig,
 } from '@/stores/diamondStore';
-import { DEFAULT_DIAMOND_MATERIAL, DEFAULT_DIAMOND_GEOMETRY } from '@/types/diamond';
 import { COLORS } from '@/constants/colors';
-import type { TapEvent } from '@/types/diamond';
+import { DEFAULT_DIAMOND_GEOMETRY } from '@/types/diamond';
+import {
+  DIAMOND_ANIMATION,
+  DIAMOND_MATERIAL_POLISH,
+  EMOTIONAL_POLISH,
+} from '@/constants/diamondConfig';
+import type { TapEvent, DiamondAnimationState, EmotionalPolishState } from '@/types/diamond';
 
 interface DiamondProps {
   position?: [number, number, number];
@@ -28,6 +33,23 @@ export function Diamond({ position = [0, 0, 0], scale = 1, onTap }: DiamondProps
   const crackConfig = useCurrentCrackConfig();
   const isInteractive = useDiamondStore((state) => state.isInteractive);
 
+  const [animState] = useState<DiamondAnimationState>({
+    heartbeatPhase: 0,
+    floatPhase: 0,
+    rotationWobble: 0,
+    currentScale: 1,
+    currentEmissive: DIAMOND_MATERIAL_POLISH.emissiveBase,
+    pulseActive: false,
+    pulseStartTime: 0,
+  });
+
+  const [emotionalState] = useState<EmotionalPolishState>({
+    pinkRadianceIntensity: EMOTIONAL_POLISH.pinkRadiance.intensity,
+    heartReflectionOpacity: EMOTIONAL_POLISH.heartShapedReflection.opacity,
+    subsurfaceScatterIntensity: EMOTIONAL_POLISH.subsurfaceScatter.intensity,
+    radiancePulsePhase: 0,
+  });
+
   const { scene } = useGLTF('/models/diamond.glb');
 
   const fallbackGeometry = useMemo(() => {
@@ -35,8 +57,8 @@ export function Diamond({ position = [0, 0, 0], scale = 1, onTap }: DiamondProps
   }, []);
 
   const material = useMemo(() => {
-    const baseRoughness = 0.05;
-    const baseTransmission = DEFAULT_DIAMOND_MATERIAL.transmission;
+    const baseRoughness = DIAMOND_MATERIAL_POLISH.roughness;
+    const baseTransmission = DIAMOND_MATERIAL_POLISH.transmission;
 
     const adjustedRoughness = Math.min(1, baseRoughness + crackConfig.roughnessModifier);
     const adjustedTransmission = Math.max(0, baseTransmission + crackConfig.transmissionModifier);
@@ -45,14 +67,14 @@ export function Diamond({ position = [0, 0, 0], scale = 1, onTap }: DiamondProps
       color: new THREE.Color(COLORS.primary.main),
       transmission: adjustedTransmission,
       roughness: adjustedRoughness,
-      metalness: DEFAULT_DIAMOND_MATERIAL.metalness,
-      ior: DEFAULT_DIAMOND_MATERIAL.ior,
-      thickness: 0.8,
-      envMapIntensity: 2.5,
-      clearcoat: DEFAULT_DIAMOND_MATERIAL.clearcoat,
-      clearcoatRoughness: 0.05,
+      metalness: DIAMOND_MATERIAL_POLISH.metalness,
+      ior: DIAMOND_MATERIAL_POLISH.ior,
+      thickness: DIAMOND_MATERIAL_POLISH.thickness,
+      envMapIntensity: DIAMOND_MATERIAL_POLISH.envMapIntensity,
+      clearcoat: DIAMOND_MATERIAL_POLISH.clearcoat,
+      clearcoatRoughness: DIAMOND_MATERIAL_POLISH.clearcoatRoughness,
       emissive: new THREE.Color(COLORS.primary.dark),
-      emissiveIntensity: 0.2,
+      emissiveIntensity: DIAMOND_MATERIAL_POLISH.emissiveBase,
       transparent: true,
       side: THREE.FrontSide,
     });
@@ -83,11 +105,52 @@ export function Diamond({ position = [0, 0, 0], scale = 1, onTap }: DiamondProps
   }, [scene, fallbackGeometry]);
 
   useFrame((state) => {
-    if (!groupRef.current) return;
+    if (!groupRef.current || !meshRef.current) return;
 
     const time = state.clock.elapsedTime;
-    const rotationSpeed = 0.2;
+
+    if (DIAMOND_ANIMATION.heartbeat.enabled) {
+      const heartbeatFreq = DIAMOND_ANIMATION.heartbeat.speedFactor;
+      const heartbeatPhase = Math.sin(time * heartbeatFreq);
+
+      const scaleMultiplier = 1 + heartbeatPhase * DIAMOND_ANIMATION.heartbeat.scaleAmplitude;
+      animState.currentScale = scaleMultiplier;
+
+      const emissiveVariation = heartbeatPhase * DIAMOND_ANIMATION.heartbeat.emissiveAmplitude;
+      animState.currentEmissive = DIAMOND_MATERIAL_POLISH.emissiveBase + emissiveVariation;
+
+      if (meshRef.current.material instanceof THREE.MeshPhysicalMaterial) {
+        meshRef.current.material.emissiveIntensity = animState.currentEmissive;
+      }
+
+      if (EMOTIONAL_POLISH.pinkRadiance.enabled && crackLevel > 0) {
+        const radiance = EMOTIONAL_POLISH.pinkRadiance.intensity + Math.sin(time * 1.2) * 0.05;
+        emotionalState.pinkRadianceIntensity = radiance;
+
+        if (meshRef.current.material instanceof THREE.MeshPhysicalMaterial) {
+          const currentEmissive = meshRef.current.material.emissiveIntensity;
+          meshRef.current.material.emissiveIntensity = currentEmissive + radiance * 0.2;
+        }
+      }
+    }
+
+    const rotationSpeed = DIAMOND_ANIMATION.rotation.baseSpeed;
+    const wobbleX = Math.sin(time * 0.7) * DIAMOND_ANIMATION.rotation.wobbleIntensity;
+    const wobbleZ = Math.cos(time * 0.5) * DIAMOND_ANIMATION.rotation.wobbleIntensity;
+
     groupRef.current.rotation.y = time * rotationSpeed;
+    groupRef.current.rotation.x = wobbleX;
+    groupRef.current.rotation.z = wobbleZ;
+
+    const floatOffset =
+      Math.sin(time * DIAMOND_ANIMATION.float.speed) * DIAMOND_ANIMATION.float.amplitude;
+    const floatWobble = Math.cos(time * DIAMOND_ANIMATION.float.wobbleFrequency) * 0.02;
+    groupRef.current.position.y = position[1] + floatOffset + floatWobble;
+
+    const tiltX = Math.sin(time * 0.3) * DIAMOND_ANIMATION.rotation.tiltVariation;
+    const tiltZ = Math.cos(time * 0.4) * DIAMOND_ANIMATION.rotation.tiltVariation;
+    groupRef.current.rotation.x += tiltX;
+    groupRef.current.rotation.z += tiltZ;
   });
 
   const handleClick = useCallback(
@@ -112,9 +175,12 @@ export function Diamond({ position = [0, 0, 0], scale = 1, onTap }: DiamondProps
         crackLevel,
       };
 
+      animState.pulseActive = true;
+      animState.pulseStartTime = Date.now();
+
       onTap(tapEvent);
     },
-    [isInteractive, onTap, crackLevel]
+    [isInteractive, onTap, crackLevel, animState]
   );
 
   return (
@@ -124,15 +190,14 @@ export function Diamond({ position = [0, 0, 0], scale = 1, onTap }: DiamondProps
         geometry={diamondGeometry}
         material={material}
         scale={[
-          DEFAULT_DIAMOND_GEOMETRY.scale[0] * scale,
-          DEFAULT_DIAMOND_GEOMETRY.scale[1] * scale,
-          DEFAULT_DIAMOND_GEOMETRY.scale[2] * scale,
+          DEFAULT_DIAMOND_GEOMETRY.scale[0] * scale * animState.currentScale,
+          DEFAULT_DIAMOND_GEOMETRY.scale[1] * scale * animState.currentScale,
+          DEFAULT_DIAMOND_GEOMETRY.scale[2] * scale * animState.currentScale,
         ]}
         onClick={handleClick}
         castShadow
         receiveShadow
       >
-        {/* Pass mesh ref so cracks can access rotation */}
         <DiamondCracks geometry={diamondGeometry} diamondMeshRef={meshRef} />
       </mesh>
 
@@ -142,7 +207,7 @@ export function Diamond({ position = [0, 0, 0], scale = 1, onTap }: DiamondProps
         receiveShadow
       >
         <planeGeometry args={[3, 3]} />
-        <shadowMaterial opacity={0.3} />
+        <shadowMaterial opacity={0.25} />
       </mesh>
     </group>
   );

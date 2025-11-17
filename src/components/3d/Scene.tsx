@@ -21,12 +21,12 @@ export function Scene() {
       <Background enableFog={true} />
 
       <Particles
-        count={120}
-        size={0.05}
-        opacity={0.6}
+        count={300} // More particles total
+        size={0.038} // Slightly smaller base
+        opacity={0.65} // Higher opacity
         spread={10}
         twinkleSpeed={0.5}
-        twinkleIntensity={0.3}
+        twinkleIntensity={0.18}
       />
 
       <group position={[0, 0, 0]}>

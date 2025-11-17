@@ -1,8 +1,9 @@
 // src/components/3d/Effects.tsx
-// Post-processing effects with cinematic bloom and vignette for professional framing
+// Enhanced post-processing with optimized bloom and vignette for premium diamond rendering
 
 import { Bloom, EffectComposer, Vignette } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
+import { SCENE_POLISH } from '@/constants/diamondConfig';
 
 interface EffectsProps {
   enableBloom?: boolean;
@@ -15,30 +16,41 @@ interface EffectsProps {
 
 export function Effects({
   enableBloom = true,
-  bloomIntensity = 0.3,
-  bloomThreshold = 0.9,
+  bloomIntensity = 0.4,
+  bloomThreshold = 0.85,
   enableVignette = true,
-  vignetteIntensity = 0.5,
-  vignetteOffset = 0.5,
+  vignetteIntensity = SCENE_POLISH.vignette.darkness,
+  vignetteOffset = SCENE_POLISH.vignette.offset,
 }: EffectsProps) {
-  if (!enableBloom && !enableVignette) {
+  const bloomEnabled = enableBloom;
+  const vignetteEnabled = enableVignette && SCENE_POLISH.vignette.enabled;
+
+  if (!bloomEnabled && !vignetteEnabled) {
     return null;
   }
 
   return (
     <EffectComposer>
-      <Bloom
-        intensity={enableBloom ? bloomIntensity : 0}
-        luminanceThreshold={bloomThreshold}
-        luminanceSmoothing={0.9}
-        mipmapBlur
-        blendFunction={BlendFunction.ADD}
-      />
-      <Vignette
-        offset={vignetteOffset}
-        darkness={enableVignette ? vignetteIntensity : 0}
-        blendFunction={BlendFunction.NORMAL}
-      />
+      <>
+        {bloomEnabled && (
+          <Bloom
+            intensity={bloomIntensity}
+            luminanceThreshold={bloomThreshold}
+            luminanceSmoothing={0.95}
+            mipmapBlur
+            blendFunction={BlendFunction.ADD}
+            radius={0.5}
+          />
+        )}
+        {vignetteEnabled && (
+          <Vignette
+            offset={vignetteOffset}
+            darkness={vignetteIntensity}
+            blendFunction={BlendFunction.NORMAL}
+            eskil={false}
+          />
+        )}
+      </>
     </EffectComposer>
   );
 }

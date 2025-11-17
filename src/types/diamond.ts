@@ -26,6 +26,16 @@ export interface DiamondMaterialConfig {
   clearcoatRoughness: number;
 }
 
+export interface DiamondAnimationState {
+  heartbeatPhase: number;
+  floatPhase: number;
+  rotationWobble: number;
+  currentScale: number;
+  currentEmissive: number;
+  pulseActive: boolean;
+  pulseStartTime: number;
+}
+
 export interface CrackConfig {
   level: CrackLevel;
   opacity: number;
@@ -37,6 +47,27 @@ export interface CrackConfig {
   audioPitch: number;
   hapticIntensity: 'light' | 'medium' | 'heavy';
   description: string;
+}
+
+export interface CrackVisualState {
+  glowIntensity: number;
+  propagationProgress: number;
+  flashActive: boolean;
+  lastCrackTimestamp: number;
+}
+
+export interface CrackDepthShading {
+  enabled: boolean;
+  surfaceColor: string;
+  deepColor: string;
+  depthFactor: number;
+}
+
+export interface CrackRefractionConfig {
+  enabled: boolean;
+  highlightColor: string;
+  highlightOpacity: number;
+  bloomMultiplier: number;
 }
 
 export interface ShardConfig {
@@ -73,6 +104,22 @@ export interface ParticleShardData {
   active: boolean;
 }
 
+export interface EmotionalPolishState {
+  pinkRadianceIntensity: number;
+  heartReflectionOpacity: number;
+  subsurfaceScatterIntensity: number;
+  radiancePulsePhase: number;
+}
+
+export interface StarParticleData {
+  position: THREE.Vector3;
+  size: number;
+  brightness: number;
+  twinklePhase: number;
+  twinkleSpeed: number;
+  isBright: boolean;
+}
+
 export const DEFAULT_DIAMOND_MATERIAL: DiamondMaterialConfig = {
   color: '#ff69b4',
   transmission: 1.0,
@@ -100,4 +147,28 @@ export const DEFAULT_SHARD_CONFIG: ShardConfig = {
   lifespan: 2000,
   spread: 1.0,
   gravity: 0.3,
+};
+
+export const DEFAULT_ANIMATION_STATE: DiamondAnimationState = {
+  heartbeatPhase: 0,
+  floatPhase: 0,
+  rotationWobble: 0,
+  currentScale: 1,
+  currentEmissive: 0.15,
+  pulseActive: false,
+  pulseStartTime: 0,
+};
+
+export const DEFAULT_CRACK_VISUAL_STATE: CrackVisualState = {
+  glowIntensity: 0,
+  propagationProgress: 0,
+  flashActive: false,
+  lastCrackTimestamp: 0,
+};
+
+export const DEFAULT_EMOTIONAL_STATE: EmotionalPolishState = {
+  pinkRadianceIntensity: 0.25,
+  heartReflectionOpacity: 0.08,
+  subsurfaceScatterIntensity: 0.15,
+  radiancePulsePhase: 0,
 };

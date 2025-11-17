@@ -1,5 +1,5 @@
 // src/App.tsx
-// Main application with Canvas, enhanced effects, and premium fade-in experience
+// Main application with enhanced post-processing and optimized renderer configuration
 
 import { Canvas } from '@react-three/fiber';
 import { Suspense } from 'react';
@@ -17,18 +17,22 @@ function App() {
           antialias: true,
           alpha: false,
           powerPreference: 'high-performance',
+          stencil: false,
+          depth: true,
         }}
         dpr={[1, 2]}
         performance={{ min: 0.5 }}
+        frameloop="always"
       >
         <Suspense fallback={null}>
           <Scene />
           <Effects
             enableBloom={true}
-            bloomIntensity={0.3}
+            bloomIntensity={0.08} // DOWN from 0.15
+            bloomThreshold={0.995} // UP from 0.98
             enableVignette={true}
             vignetteOffset={0.5}
-            vignetteIntensity={0.5}
+            vignetteIntensity={0.45}
           />
         </Suspense>
       </Canvas>
