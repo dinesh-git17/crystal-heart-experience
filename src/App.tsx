@@ -1,42 +1,31 @@
 // src/App.tsx
-// Main application component with Canvas setup and scene orchestration
+// Main application component with Canvas setup and Phase 1 scene integration
 
 import { Canvas } from '@react-three/fiber';
 import { Suspense } from 'react';
+import { Scene } from './components/3d/Scene';
+import { Effects } from './components/3d/Effects';
+import { PerformanceMonitor } from './components/3d/PerformanceMonitor';
 
 function App() {
   return (
     <div style={{ width: '100vw', height: '100vh', overflow: 'hidden', touchAction: 'none' }}>
       <Canvas
-        camera={{
-          position: [0, 0, 5],
-          fov: 45,
-          near: 0.1,
-          far: 100,
+        shadows
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: 'high-performance',
         }}
         dpr={[1, 2]}
         performance={{ min: 0.5 }}
-        gl={{
-          antialias: true,
-          alpha: true,
-          powerPreference: 'high-performance',
-        }}
       >
         <Suspense fallback={null}>
-          <color attach="background" args={['#000000']} />
-
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[10, 10, 5]} intensity={1} />
-
-          {/* Phase 1: Diamond component will be added here */}
-          {/* Phase 2: Heart component will be added here */}
-          {/* Phase 3: Camera animations will be added here */}
-          {/* Phase 4: Postprocessing effects will be added here */}
+          <Scene />
+          <Effects enableBloom={true} bloomIntensity={0.5} enableVignette={false} />
         </Suspense>
       </Canvas>
-
-      {/* Phase 5: UI overlays will be added here */}
-      {/* Phase 6: Letter component will be added here */}
+      <PerformanceMonitor />
     </div>
   );
 }
