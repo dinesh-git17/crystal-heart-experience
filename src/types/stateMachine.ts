@@ -11,7 +11,7 @@ export enum AppState {
   LETTER_DONE = 'LETTER_DONE',
 }
 
-export type CrackLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export type CrackLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export enum EventType {
   TAP = 'TAP',
@@ -31,6 +31,7 @@ export interface StateTransition {
 export interface StateMachineContext {
   currentState: AppState;
   crackLevel: CrackLevel;
+  tapCount: number;
   canTransition: boolean;
   lastTransitionTime: number;
 }
@@ -64,5 +65,5 @@ export const VALID_TRANSITIONS: StateTransitionMap = {
   },
 };
 
-export const CRACK_THRESHOLD = 7;
+export const CRACK_THRESHOLD = 6;
 export const MIN_TAP_INTERVAL = 200;

@@ -1,13 +1,17 @@
 // src/components/3d/Scene.tsx
-// Main scene orchestrator with all enhanced Phase 1 polish components
+// Main scene orchestrator with Phase 1 environment and Phase 2 diamond interaction system
 
 import { Camera } from './Camera';
 import { LightingRig } from './LightingRig';
 import { Background } from './Background';
 import { Particles } from './Particles';
-import { Cube } from './Cube';
+import { Diamond } from './Diamond';
+import { ShardParticles } from './ShardParticles';
+import { useDiamondInteraction } from '@/hooks/useDiamondInteraction';
 
 export function Scene() {
+  const { handleTap, currentTapEvent } = useDiamondInteraction();
+
   return (
     <>
       <Camera position={[0, 0, 5]} fov={55} introAnimation={true} enableDrift={true} />
@@ -25,7 +29,11 @@ export function Scene() {
         twinkleIntensity={0.3}
       />
 
-      <Cube position={[0, 0, 0]} floatAmplitude={0.15} floatSpeed={0.8} />
+      <group position={[0, 0, 0]}>
+        <Diamond onTap={handleTap} />
+      </group>
+
+      <ShardParticles tapEvent={currentTapEvent} count={20} />
     </>
   );
 }
