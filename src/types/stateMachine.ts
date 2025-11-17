@@ -16,6 +16,9 @@ export type CrackLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export enum EventType {
   TAP = 'TAP',
   CRACK_COMPLETE = 'CRACK_COMPLETE',
+  SHATTER_START = 'SHATTER_START',
+  SHATTER_COMPLETE = 'SHATTER_COMPLETE',
+  REVEAL_START = 'REVEAL_START',
   REVEAL_COMPLETE = 'REVEAL_COMPLETE',
   TRANSITION_COMPLETE = 'TRANSITION_COMPLETE',
   TYPING_COMPLETE = 'TYPING_COMPLETE',
@@ -34,6 +37,9 @@ export interface StateMachineContext {
   tapCount: number;
   canTransition: boolean;
   lastTransitionTime: number;
+  isShattered: boolean;
+  heartRevealed: boolean;
+  transitionPhase: string;
 }
 
 export type StateTransitionMap = {
@@ -47,9 +53,11 @@ export const VALID_TRANSITIONS: StateTransitionMap = {
   [AppState.CRACKING]: {
     [EventType.TAP]: AppState.CRACKING,
     [EventType.CRACK_COMPLETE]: AppState.HEART_REVEAL,
+    [EventType.SHATTER_START]: AppState.HEART_REVEAL,
   },
   [AppState.HEART_REVEAL]: {
     [EventType.REVEAL_COMPLETE]: AppState.HEART_IDLE,
+    [EventType.TRANSITION_COMPLETE]: AppState.HEART_IDLE,
   },
   [AppState.HEART_IDLE]: {
     [EventType.TAP]: AppState.LETTER_TRANSITION,
@@ -67,3 +75,7 @@ export const VALID_TRANSITIONS: StateTransitionMap = {
 
 export const CRACK_THRESHOLD = 6;
 export const MIN_TAP_INTERVAL = 200;
+export const SHATTER_DURATION = 1800;
+export const PAUSE_DURATION = 300;
+export const HEART_REVEAL_DURATION = 1200;
+export const TOTAL_TRANSITION_DURATION = 3300;
