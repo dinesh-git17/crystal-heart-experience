@@ -1,7 +1,7 @@
 // src/components/3d/Scene.tsx
-// Main scene orchestrator with coordinated camera control for smooth transitions
+// Main scene orchestrator with Phase 4 pulse initialization and letter reveal coordination
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Camera, CameraMode, type CameraHandle } from './Camera';
 import { LightingRig } from './LightingRig';
 import { Background } from './Background';
@@ -10,11 +10,16 @@ import { Diamond } from './Diamond';
 import { ShardParticles } from './ShardParticles';
 import { TransitionOrchestrator } from './TransitionOrchestrator';
 import { useDiamondInteraction } from '@/hooks/useDiamondInteraction';
+import { useHeartStore } from '@/stores/heartStore';
+import { audioManager } from '@/utils/audioManager';
 
 export function Scene() {
   const { handleTap, currentTapEvent } = useDiamondInteraction();
   const [diamondVisible, setDiamondVisible] = useState(true);
+  const [heartIdleActivated, setHeartIdleActivated] = useState(false);
   const cameraRef = useRef<CameraHandle>(null);
+
+  const { startPulse, setLetterVisible } = useHeartStore((state) => state.actions);
 
   const handleShatterStart = useCallback(() => {
     setDiamondVisible(false);
@@ -49,9 +54,23 @@ export function Scene() {
   }, []);
 
   const handleTransitionComplete = useCallback(() => {
-    if (import.meta.env.DEV) {
-      console.log('Transition complete, heart now idle and ready for Phase 4');
+    if (!heartIdleActivated) {
+      setHeartIdleActivated(true);
+
+      const bpm = audioManager.getMusicBPM();
+      startPulse(bpm);
+      setLetterVisible(true);
+
+      if (import.meta.env.DEV) {
+        console.log('Phase 4 activated: Heart pulsing at', bpm, 'BPM with letter visible');
+      }
     }
+  }, [heartIdleActivated, startPulse, setLetterVisible]);
+
+  useEffect(() => {
+    return () => {
+      setHeartIdleActivated(false);
+    };
   }, []);
 
   return (

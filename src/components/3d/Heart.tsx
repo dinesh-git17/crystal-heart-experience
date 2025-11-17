@@ -1,5 +1,5 @@
 // src/components/3d/Heart.tsx
-// Heart component with advanced material, heartbeat idle animation, breath-in moment, and cinematic polish
+// Heart component with Phase 3 entrance animation, Phase 4 pulse synchronization, letter integration, and tap interaction
 
 import { useRef, useMemo, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -14,6 +14,11 @@ import {
   heartbeatPulse,
 } from '@/utils/easingFunctions';
 import { useHeartMaterial, HeartMaterialComponent } from './materials/HeartMaterial';
+import { useHeartPulse } from '@/hooks/useHeartPulse';
+import { useHeartInteraction } from '@/hooks/useHeartInteraction';
+import { Letter } from './Letter';
+import { LetterShimmer } from './LetterShimmer';
+import { InteractionHint, applyHintIntensity, applyHintEmissiveIntensity } from './InteractionHint';
 
 interface HeartProps {
   startReveal: boolean;
@@ -29,6 +34,11 @@ export function Heart({ startReveal, position = [0, 0, 0], onRevealComplete }: H
   const breathPhaseRef = useRef(0);
 
   const isVisible = useHeartStore((state) => state.isVisible);
+  const isPulsing = useHeartStore((state) => state.isPulsing);
+  const bpm = useHeartStore((state) => state.bpm);
+  const letterVisible = useHeartStore((state) => state.letterVisible);
+  const showInteractionHint = useHeartStore((state) => state.showInteractionHint);
+
   const {
     startReveal: startRevealAction,
     updateScale,
@@ -42,6 +52,11 @@ export function Heart({ startReveal, position = [0, 0, 0], onRevealComplete }: H
   const [materialOpacity, setMaterialOpacity] = useState(0);
 
   const { scene } = useGLTF('/models/heart.glb');
+
+  const { pulseScale, pulseEmissive } = useHeartPulse(bpm, isPulsing);
+
+  const { handleHeartTap, isInteractive, showHint, handlePointerOver, handlePointerOut } =
+    useHeartInteraction();
 
   const fallbackGeometry = useMemo(() => {
     return new THREE.OctahedronGeometry(1, 2);
@@ -74,7 +89,8 @@ export function Heart({ startReveal, position = [0, 0, 0], onRevealComplete }: H
     }
 
     geometry.center();
-    geometry.rotateX(-Math.PI / 2);
+    geometry.rotateZ(-Math.PI / 2);
+    geometry.rotateY(Math.PI / 2);
 
     if (!geometry.boundingBox) {
       geometry.computeBoundingBox();
@@ -131,16 +147,28 @@ export function Heart({ startReveal, position = [0, 0, 0], onRevealComplete }: H
 
       const idleScale =
         DEFAULT_HEART_ANIMATION.targetScale + beatValue * HEARTBEAT_IDLE.scaleAmplitude;
-      groupRef.current.scale.setScalar(idleScale);
 
-      groupRef.current.rotation.y += HEARTBEAT_IDLE.rotationDrift;
+      let finalScale = idleScale;
+
+      if (isPulsing) {
+        const adjustedPulseScale = applyHintIntensity(pulseScale, showHint);
+        finalScale = idleScale * adjustedPulseScale;
+      }
+
+      groupRef.current.scale.setScalar(finalScale);
+      updatePulsePhase(beatProgress);
+      updateScale(finalScale);
+
+      groupRef.current.rotation.y = 0;
 
       breathPhaseRef.current += deltaTime * 0.3;
       const breathValue = Math.sin(breathPhaseRef.current) * 0.005;
       groupRef.current.position.y = position[1] + breathValue;
 
-      updatePulsePhase(beatProgress);
-      updateScale(idleScale);
+      if (isPulsing && meshRef.current.material instanceof THREE.MeshPhysicalMaterial) {
+        const adjustedEmissive = applyHintEmissiveIntensity(pulseEmissive, showHint);
+        meshRef.current.material.emissiveIntensity = adjustedEmissive;
+      }
 
       return;
     }
@@ -195,51 +223,27 @@ export function Heart({ startReveal, position = [0, 0, 0], onRevealComplete }: H
 
     if (elapsed >= breathInStart && elapsed < breathInEnd) {
       const breathProgress = (elapsed - breathInStart) / DEFAULT_HEART_ANIMATION.breathInDuration;
-
-      let breathScale: number;
-      if (breathProgress < 0.5) {
-        const inhaleProgress = breathProgress / 0.5;
-        breathScale =
-          DEFAULT_HEART_ANIMATION.targetScale +
-          easeOutCubic(inhaleProgress) *
-            (DEFAULT_HEART_ANIMATION.breathInScale - DEFAULT_HEART_ANIMATION.targetScale);
-      } else {
-        const exhaleProgress = (breathProgress - 0.5) / 0.5;
-        breathScale =
-          DEFAULT_HEART_ANIMATION.breathInScale -
-          easeInOutCubic(exhaleProgress) *
-            (DEFAULT_HEART_ANIMATION.breathInScale - DEFAULT_HEART_ANIMATION.targetScale);
-      }
-
-      groupRef.current.scale.setScalar(breathScale);
-      updateScale(breathScale);
+      const breathScale = 1.0 + easeInOutCubic(breathProgress) * 0.02;
+      groupRef.current.scale.setScalar(DEFAULT_HEART_ANIMATION.targetScale * breathScale);
     }
 
-    if (elapsed >= totalDuration) {
-      groupRef.current.scale.setScalar(DEFAULT_HEART_ANIMATION.targetScale);
-      groupRef.current.rotation.y = 0;
-      setMaterialOpacity(1.0);
-
-      updateScale(DEFAULT_HEART_ANIMATION.targetScale);
-      updateRotation(0);
+    if (elapsed >= totalDuration && isAnimatingRef.current) {
       isAnimatingRef.current = false;
       setIsIdle(true);
       completeReveal();
+      groupRef.current.scale.setScalar(DEFAULT_HEART_ANIMATION.targetScale);
+      groupRef.current.rotation.y = 0;
+      updateScale(DEFAULT_HEART_ANIMATION.targetScale);
 
       if (onRevealComplete) {
         onRevealComplete();
       }
-      return;
+
+      if (import.meta.env.DEV) {
+        console.log('Heart entrance animation complete, entering idle state');
+      }
     }
   });
-
-  useEffect(() => {
-    return () => {
-      if (meshRef.current && meshRef.current.material instanceof THREE.Material) {
-        meshRef.current.material.dispose();
-      }
-    };
-  }, []);
 
   if (!isVisible) {
     return null;
@@ -247,13 +251,32 @@ export function Heart({ startReveal, position = [0, 0, 0], onRevealComplete }: H
 
   return (
     <group ref={groupRef} position={position}>
-      <mesh ref={meshRef} geometry={heartGeometry} material={material} castShadow receiveShadow />
+      <mesh
+        ref={meshRef}
+        geometry={heartGeometry}
+        material={material}
+        castShadow
+        receiveShadow
+        onClick={isInteractive ? handleHeartTap : undefined}
+        onPointerOver={isInteractive ? handlePointerOver : undefined}
+        onPointerOut={isInteractive ? handlePointerOut : undefined}
+      />
+
       <HeartMaterialComponent
         meshRef={meshRef}
         isIdle={isIdle}
         opacity={materialOpacity}
-        position={[0, 0, 0]}
+        position={position}
       />
+
+      {letterVisible && (
+        <>
+          <Letter position={[0, 0, 1.0]} scale={0.8} />
+          <LetterShimmer letterPosition={[0, 0, 1.0]} particleCount={8} orbitRadius={0.3} />
+        </>
+      )}
+
+      {showInteractionHint && <InteractionHint enabled={showInteractionHint} />}
     </group>
   );
 }

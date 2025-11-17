@@ -179,12 +179,12 @@ export const DEFAULT_HEART_STATE: HeartState = {
 export const DEFAULT_HEART_MATERIAL: HeartMaterialConfig = {
   color: '#ff69b4',
   emissive: '#ff1493',
-  emissiveIntensity: 0.8,
+  emissiveIntensity: 0.5, // ← Reduced from 0.8 to 0.5 (less glow)
   roughness: 0.4,
-  metalness: 0.3,
-  transmission: 0.2,
+  metalness: 0.1, // ← Reduced from 0.3 to 0.1 (more glass-like)
+  transmission: 0.95, // ← Should already be 0.95 (very transparent)
   ior: 1.5,
-  thickness: 0.5,
+  thickness: 0.1, // ← Should already be 0.1 (thin)
   clearcoat: 0.6,
   clearcoatRoughness: 0.15,
 };

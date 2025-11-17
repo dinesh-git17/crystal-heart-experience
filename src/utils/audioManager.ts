@@ -1,8 +1,9 @@
 // src/utils/audioManager.ts
-// Audio manager with custom crack, shatter, and looping background music using Web Audio API
+// Audio manager with custom crack, shatter, looping background music, and optional heartbeat sound using Web Audio API
 
 import { CRACK_SOUND_VOLUME } from '@/constants/crackLevels';
 import type { CrackLevel } from '@/types/diamond';
+import { BACKGROUND_MUSIC_BPM } from '@/utils/bpmSync';
 
 interface MusicLoopConfig {
   loopStart: number;
@@ -25,6 +26,7 @@ class AudioManager {
   private volume = CRACK_SOUND_VOLUME;
   private gainNode: GainNode | null = null;
   private musicGainNode: GainNode | null = null;
+  private heartbeatGainNode: GainNode | null = null;
   private currentMusicSource: AudioBufferSourceNode | null = null;
   private musicPlaying = false;
   private musicFadeInterval: number | null = null;
@@ -35,6 +37,9 @@ class AudioManager {
   private backgroundMusicBuffer: AudioBuffer | null = null;
   private backgroundMusicLoaded = false;
   private musicConfig: MusicLoopConfig = DEFAULT_MUSIC_CONFIG;
+  private heartbeatEnabled = false;
+  private heartbeatVolume = 0.08;
+  private lastHeartbeatPhase = -1;
 
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -53,19 +58,22 @@ class AudioManager {
       this.musicGainNode.connect(this.context.destination);
       this.musicGainNode.gain.value = 0;
 
+      this.heartbeatGainNode = this.context.createGain();
+      this.heartbeatGainNode.connect(this.context.destination);
+      this.heartbeatGainNode.gain.value = 0;
+
       this.initialized = true;
 
-      if (this.context.state === 'suspended') {
-        await this.context.resume();
-      }
+      await this.loadCrackSound();
+      await this.loadShatterSound();
+      await this.loadBackgroundMusic();
 
-      await Promise.all([
-        this.loadCrackSound(),
-        this.loadShatterSound(),
-        this.loadBackgroundMusic(),
-      ]);
+      if (import.meta.env.DEV) {
+        console.log('AudioManager initialized successfully');
+      }
     } catch (error) {
-      console.error('Failed to initialize AudioContext:', error);
+      console.error('Failed to initialize AudioManager:', error);
+      this.initialized = false;
     }
   }
 
@@ -126,6 +134,7 @@ class AudioManager {
       if (import.meta.env.DEV) {
         console.log('Background music loaded successfully');
         console.log('Duration:', duration.toFixed(2), 'seconds');
+        console.log('BPM:', BACKGROUND_MUSIC_BPM);
         console.log('Loop: start =', this.musicConfig.loopStart, 'end =', this.musicConfig.loopEnd);
       }
     } catch (error) {
@@ -141,6 +150,78 @@ class AudioManager {
     if (import.meta.env.DEV) {
       console.log('Music loop points updated:', { loopStart, loopEnd });
     }
+  }
+
+  getMusicBPM(): number {
+    return BACKGROUND_MUSIC_BPM;
+  }
+
+  enableHeartbeat(): void {
+    this.heartbeatEnabled = true;
+    if (import.meta.env.DEV) {
+      console.log('Heartbeat sound enabled');
+    }
+  }
+
+  disableHeartbeat(): void {
+    this.heartbeatEnabled = false;
+    if (import.meta.env.DEV) {
+      console.log('Heartbeat sound disabled');
+    }
+  }
+
+  setHeartbeatVolume(volume: number): void {
+    this.heartbeatVolume = Math.max(0, Math.min(1, volume));
+    if (import.meta.env.DEV) {
+      console.log('Heartbeat volume set to:', this.heartbeatVolume);
+    }
+  }
+
+  syncHeartbeatToPulse(pulsePhase: number): void {
+    if (!this.heartbeatEnabled || !this.context || !this.heartbeatGainNode) {
+      return;
+    }
+
+    const peakThreshold = 0.05;
+    const isAtPeak = pulsePhase < peakThreshold;
+
+    if (isAtPeak && this.lastHeartbeatPhase >= peakThreshold) {
+      this.playHeartbeatSound();
+    }
+
+    this.lastHeartbeatPhase = pulsePhase;
+  }
+
+  playHeartbeatSound(): void {
+    if (!this.context || !this.heartbeatGainNode || this.muted) {
+      return;
+    }
+
+    const oscillator = this.context.createOscillator();
+    const envelope = this.context.createGain();
+
+    oscillator.connect(envelope);
+    envelope.connect(this.heartbeatGainNode);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 60;
+
+    const now = this.context.currentTime;
+    const duration = 0.15;
+
+    envelope.gain.setValueAtTime(0, now);
+    envelope.gain.linearRampToValueAtTime(this.heartbeatVolume, now + 0.02);
+    envelope.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    this.heartbeatGainNode.gain.value = this.muted ? 0 : 1;
+
+    oscillator.start(now);
+    oscillator.stop(now + duration);
+
+    oscillator.onended = () => {
+      oscillator.disconnect();
+      envelope.disconnect();
+    };
   }
 
   private async ensureContext(): Promise<boolean> {
@@ -181,21 +262,21 @@ class AudioManager {
     const source = this.context.createBufferSource();
     source.buffer = this.crackSoundBuffer;
 
-    const playbackRate = 0.9 + level * 0.08;
+    const crackGain = this.context.createGain();
+    const volumeScale = 0.6 + level * 0.06;
+    crackGain.gain.value = volumeScale;
+
+    source.connect(crackGain);
+    crackGain.connect(this.gainNode);
+
+    const playbackRate = 0.95 + level * 0.02;
     source.playbackRate.value = playbackRate;
-
-    const levelGain = this.context.createGain();
-    const volumeMultiplier = 0.8 + level * 0.04;
-    levelGain.gain.value = volumeMultiplier;
-
-    source.connect(levelGain);
-    levelGain.connect(this.gainNode);
 
     source.start(0);
 
     source.onended = () => {
       source.disconnect();
-      levelGain.disconnect();
+      crackGain.disconnect();
     };
   }
 
@@ -204,23 +285,24 @@ class AudioManager {
       return;
     }
 
-    const baseFrequency = 800;
-    const frequency = baseFrequency * (1 + level * 0.15);
-    const duration = 0.15 - level * 0.01;
-
     const oscillator = this.context.createOscillator();
     const envelope = this.context.createGain();
 
     oscillator.connect(envelope);
     envelope.connect(this.gainNode);
 
-    oscillator.type = 'sine';
-    oscillator.frequency.value = frequency;
+    const baseFrequency = 800 + level * 100;
+    oscillator.type = 'square';
+    oscillator.frequency.value = baseFrequency;
 
     const now = this.context.currentTime;
+    const duration = 0.15;
+
     envelope.gain.setValueAtTime(0, now);
     envelope.gain.linearRampToValueAtTime(0.3, now + 0.01);
     envelope.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+    oscillator.frequency.exponentialRampToValueAtTime(baseFrequency * 0.5, now + duration);
 
     oscillator.start(now);
     oscillator.stop(now + duration);
@@ -344,6 +426,7 @@ class AudioManager {
       console.log('Custom background music started with loop:', {
         loopStart: this.musicConfig.loopStart,
         loopEnd: this.musicConfig.loopEnd,
+        bpm: BACKGROUND_MUSIC_BPM,
       });
     }
   }
@@ -480,6 +563,9 @@ class AudioManager {
     }
     if (this.musicGainNode) {
       this.musicGainNode.gain.value = 0;
+    }
+    if (this.heartbeatGainNode) {
+      this.heartbeatGainNode.gain.value = 0;
     }
   }
 

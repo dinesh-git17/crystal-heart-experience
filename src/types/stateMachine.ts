@@ -1,5 +1,5 @@
 // src/types/stateMachine.ts
-// Type definitions for the application state machine that controls experience flow
+// Type definitions for the application state machine that controls experience flow with Phase 4 enhancements
 
 export enum AppState {
   INTRO = 'INTRO',
@@ -23,6 +23,10 @@ export enum EventType {
   TRANSITION_COMPLETE = 'TRANSITION_COMPLETE',
   TYPING_COMPLETE = 'TYPING_COMPLETE',
   RESET = 'RESET',
+  HEART_PULSE_START = 'HEART_PULSE_START',
+  TAP_HEART = 'TAP_HEART',
+  INTERACTION_HINT_SHOWN = 'INTERACTION_HINT_SHOWN',
+  LETTER_TRANSITION_START = 'LETTER_TRANSITION_START',
 }
 
 export interface StateTransition {
@@ -40,6 +44,10 @@ export interface StateMachineContext {
   isShattered: boolean;
   heartRevealed: boolean;
   transitionPhase: string;
+  heartPulsing: boolean;
+  letterVisible: boolean;
+  interactionHintActive: boolean;
+  timeSinceHeartRevealed: number;
 }
 
 export type StateTransitionMap = {
@@ -61,6 +69,7 @@ export const VALID_TRANSITIONS: StateTransitionMap = {
   },
   [AppState.HEART_IDLE]: {
     [EventType.TAP]: AppState.LETTER_TRANSITION,
+    [EventType.TAP_HEART]: AppState.LETTER_TRANSITION,
   },
   [AppState.LETTER_TRANSITION]: {
     [EventType.TRANSITION_COMPLETE]: AppState.LETTER_TYPING,
@@ -79,3 +88,5 @@ export const SHATTER_DURATION = 1800;
 export const PAUSE_DURATION = 300;
 export const HEART_REVEAL_DURATION = 1200;
 export const TOTAL_TRANSITION_DURATION = 3300;
+export const HEART_PULSE_BPM = 140;
+export const INTERACTION_HINT_DELAY = 5000;
