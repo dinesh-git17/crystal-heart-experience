@@ -1,73 +1,67 @@
-# React + TypeScript + Vite
+// README.md
+// Crystal Heart Love Letter Experience - Interactive 3D romantic web application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# Crystal Heart Love Letter Experience
 
-Currently, two official plugins are available:
+An interactive 3D romantic web experience featuring a diamond-to-heart transformation with crack progression mechanics and immersive visual effects. Built with production-grade standards targeting 50-60 FPS performance on mobile devices.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Project Vision
 
-## React Compiler
+A premium interactive love letter experience that transforms a crystal diamond into a beating heart through user interaction. The experience guides users through a carefully choreographed journey: diamond cracking, heart reveal, and personalized letter display—all rendered in real-time 3D with cinematic quality.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Key Features
 
-## Expanding the ESLint configuration
+- **Interactive Diamond System**: Progressive crack mechanics with haptic feedback and spatial audio
+- **State Machine Architecture**: Deterministic flow from intro → cracking → heart reveal → letter display
+- **Premium Visual Quality**: Physically-based rendering with bloom, subsurface scattering, and particle effects
+- **Mobile-First Optimization**: Designed for iPhone Safari with aggressive performance optimization
+- **Emotional Polish**: Pink radiance, heartbeat animations, and romantic lighting atmosphere
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Technology Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+**Core**: React 18, TypeScript (strict mode), Vite  
+**3D Engine**: React Three Fiber, Drei, Three.js  
+**Effects**: Postprocessing, custom shaders  
+**State**: Zustand  
+**Animation**: Framer Motion, custom GSAP-style easing  
+**Audio**: Web Audio API with spatial positioning  
+**Haptics**: iOS Taptic Engine integration
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Development Standards
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Zero ESLint errors
+- Zero TypeScript `any` types
+- FAANG-level code quality
+- Mobile-first responsive design
+- 50-60 FPS performance target
+- Production-ready (no TODO comments)
+
+## Current Status
+
+**Phase 0**: ✅ Complete - Foundation, build system, development environment  
+**Phase 1**: ✅ Complete - Environment setup, lighting, particles, background  
+**Phase 2**: ✅ Complete - Diamond component, crack system, interaction mechanics  
+**Phase 3**: 🚧 In Progress - Next phase queued
+
+## Project Architecture
+
+```
+src/
+├── components/
+│   ├── 3d/          # Three.js components (Scene, Diamond, Camera, etc.)
+│   └── ui/          # 2D overlay components
+├── stores/          # Zustand state management
+├── hooks/           # Custom React hooks
+├── types/           # TypeScript definitions
+├── constants/       # Configuration and constants
+├── utils/           # Helper functions
+└── assets/          # 3D models, audio, textures
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Design Philosophy
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+The experience prioritizes emotional impact through technical excellence: every animation curve, every particle emission, every color gradient is crafted to evoke wonder and romance. Performance is non-negotiable—the magic only works at 60fps.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
+
+_Built with ❤️ for the ultimate digital love letter_
