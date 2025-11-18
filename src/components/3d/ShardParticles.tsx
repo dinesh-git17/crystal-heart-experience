@@ -1,5 +1,5 @@
 // src/components/3d/ShardParticles.tsx
-// Optimized particle system for crystal shards with object pooling and lifecycle management
+// Optimized particle system for crystal shards with object pooling, lifecycle management, and phase-aware cleanup
 
 import { useRef, useMemo, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
@@ -25,6 +25,7 @@ export function ShardParticles({ tapEvent, count = 20, onComplete }: ShardPartic
   const particlesRef = useRef<ParticleShardData[]>([]);
   const matrixRef = useRef(new THREE.Matrix4());
   const colorRef = useRef(new THREE.Color(COLORS.primary.main));
+  const lastTapEventRef = useRef<number | null>(null);
 
   const geometry = useMemo(() => {
     return new THREE.TetrahedronGeometry(PARTICLE_SIZE, 0);
@@ -40,6 +41,12 @@ export function ShardParticles({ tapEvent, count = 20, onComplete }: ShardPartic
 
   useEffect(() => {
     if (!tapEvent || !meshRef.current) return;
+
+    // Prevent duplicate particle generation for the same tap event
+    if (lastTapEventRef.current === tapEvent.timestamp) {
+      return;
+    }
+    lastTapEventRef.current = tapEvent.timestamp;
 
     const activeCount = particlesRef.current.filter((p) => p.active).length;
     if (activeCount + count > MAX_PARTICLES) {
@@ -98,6 +105,30 @@ export function ShardParticles({ tapEvent, count = 20, onComplete }: ShardPartic
       }
     }
   }, [tapEvent, count]);
+
+  // Clean up all particles when component unmounts or tapEvent becomes null permanently
+  useEffect(() => {
+    return () => {
+      // Clear all particles on unmount
+      particlesRef.current.forEach((particle) => {
+        particle.active = false;
+      });
+
+      if (meshRef.current) {
+        for (let i = 0; i < particlesRef.current.length; i++) {
+          meshRef.current.setColorAt(i, new THREE.Color(0, 0, 0));
+          const emptyMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+          meshRef.current.setMatrixAt(i, emptyMatrix);
+        }
+        if (meshRef.current.instanceColor) {
+          meshRef.current.instanceColor.needsUpdate = true;
+        }
+        if (meshRef.current.instanceMatrix) {
+          meshRef.current.instanceMatrix.needsUpdate = true;
+        }
+      }
+    };
+  }, []);
 
   useFrame((_state, delta) => {
     if (!meshRef.current) return;

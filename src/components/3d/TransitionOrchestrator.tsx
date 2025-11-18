@@ -1,5 +1,5 @@
 // src/components/3d/TransitionOrchestrator.tsx
-// High-level coordinator for diamond shatter to heart reveal transition with camera coordination
+// High-level coordinator for diamond shatter to heart reveal transition with proper cleanup
 
 import { useEffect, useState, useCallback } from 'react';
 import { useThree } from '@react-three/fiber';
@@ -38,6 +38,8 @@ export function TransitionOrchestrator({
   const [heartRevealTriggered, setHeartRevealTriggered] = useState(false);
   const [musicStarted, setMusicStarted] = useState(false);
   const [transitionComplete, setTransitionComplete] = useState(false);
+  const [showShatterEffect, setShowShatterEffect] = useState(false);
+  const [shatterEffectComplete, setShatterEffectComplete] = useState(false);
 
   const [triggerCameraDolly, setTriggerCameraDolly] = useState(false);
   const [triggerSpotlight, setTriggerSpotlight] = useState(false);
@@ -46,14 +48,18 @@ export function TransitionOrchestrator({
   const [triggerLightFlares, setTriggerLightFlares] = useState(false);
 
   useEffect(() => {
-    if (isShattered && onShatterStart && currentPhase === TransitionPhase.SHATTER_START) {
-      onShatterStart();
+    if (isShattered && !showShatterEffect) {
+      setShowShatterEffect(true);
+
+      if (onShatterStart) {
+        onShatterStart();
+      }
 
       if (import.meta.env.DEV) {
         console.log('Orchestrator: Shatter started');
       }
     }
-  }, [isShattered, currentPhase, onShatterStart]);
+  }, [isShattered, showShatterEffect, onShatterStart]);
 
   useEffect(() => {
     if (currentPhase === TransitionPhase.HEART_FADE_IN && !heartRevealTriggered) {
@@ -102,6 +108,17 @@ export function TransitionOrchestrator({
   }, [currentPhase, musicStarted]);
 
   const handleShatterComplete = useCallback(() => {
+    // Mark shatter as complete and unmount ShatterEffect after a delay
+    setShatterEffectComplete(true);
+
+    setTimeout(() => {
+      setShowShatterEffect(false);
+
+      if (import.meta.env.DEV) {
+        console.log('Orchestrator: ShatterEffect unmounted');
+      }
+    }, 500);
+
     if (import.meta.env.DEV) {
       console.log('Orchestrator: Shatter animation complete, entering pause phase');
     }
@@ -144,9 +161,9 @@ export function TransitionOrchestrator({
 
   return (
     <>
-      {isShattered && (
+      {showShatterEffect && !shatterEffectComplete && (
         <ShatterEffect
-          trigger={isShattered}
+          trigger={true}
           diamondPosition={diamondPosition}
           onComplete={handleShatterComplete}
         />

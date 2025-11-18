@@ -1,5 +1,5 @@
 // src/components/3d/Scene.tsx
-// Main scene orchestrator with Phase 4 pulse initialization and letter reveal coordination
+// Main scene orchestrator with Phase 4 pulse initialization and letter reveal coordination - Fixed shard persistence
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Camera, CameraMode, type CameraHandle } from './Camera';
@@ -17,15 +17,18 @@ export function Scene() {
   const { handleTap, currentTapEvent } = useDiamondInteraction();
   const [diamondVisible, setDiamondVisible] = useState(true);
   const [heartIdleActivated, setHeartIdleActivated] = useState(false);
+  const [showShardParticles, setShowShardParticles] = useState(true);
   const cameraRef = useRef<CameraHandle>(null);
 
   const { startPulse, setLetterVisible } = useHeartStore((state) => state.actions);
 
   const handleShatterStart = useCallback(() => {
     setDiamondVisible(false);
+    // Completely remove the shard particles component when shatter starts
+    setShowShardParticles(false);
 
     if (import.meta.env.DEV) {
-      console.log('Diamond hidden, shatter animation starting');
+      console.log('Diamond hidden, shatter animation starting, shard particles unmounted');
     }
   }, []);
 
@@ -70,6 +73,7 @@ export function Scene() {
   useEffect(() => {
     return () => {
       setHeartIdleActivated(false);
+      setShowShardParticles(true);
     };
   }, []);
 
@@ -99,7 +103,7 @@ export function Scene() {
       <group position={[0, 0, 0]}>
         {diamondVisible && <Diamond onTap={handleTap} />}
 
-        <ShardParticles tapEvent={currentTapEvent} count={20} />
+        {showShardParticles && <ShardParticles tapEvent={currentTapEvent} count={20} />}
 
         <TransitionOrchestrator
           diamondPosition={[0, 0, 0]}
